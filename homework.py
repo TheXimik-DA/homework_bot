@@ -53,29 +53,20 @@ def send_message(bot, message):
 def get_api_answer(current_timestamp):
     """Проверка статуса домашней работы."""
     timestamp = current_timestamp or int(time.time())
-    params_request = {
-        'url': ENDPOINT,
-        'headers': HEADERS,
-        'params': {'from_date': timestamp},
-    }
+    params = {'from_date': timestamp}
     try:
-        logging.info(
-            'Старт запроса: url = {url},'
-            'headers = {headers},'
-            'params = {params}'.format(**params_request))
-        homework_status = requests.get(**params_request)
-        if homework_status.status_code != HTTPStatus.OK:
-            raise exceptions.InvalidResponseCode(
-                'Не удалось получить ответ API, '
-                f'Ошибка: {homework_status.status_code}'
-                f'Причина: {homework_status.reason}'
-                f'Текст: {homework_status.text}')
-        return homework_status.json()
-    except Exception:
-        raise exceptions.ConnectinError(
-            'Не корректный код ответа, параметры запроса: url = {url},'
-            'headers = {headers},'
-            'params = {params}'.format(**params_request))
+        homework_statuses = requests.get(
+            ENDPOINT,
+            headers=HEADERS,
+            params=params,
+        )
+        if homework_statuses.status_code != HTTPStatus.OK:
+            raise Exception(f'Недоступность эндпойнта '
+                            f'{homework_statuses.status_code}')
+        else:
+            return homework_statuses.json()
+    except Exception as error:
+        raise Exception(f'Сбой при запросе к эндпойнту: {error}')
 
 
 def check_response(response) -> list:
@@ -98,17 +89,18 @@ def check_response(response) -> list:
 def parse_status(homework):
     """Парсинг ответов."""
     if 'homework_name' not in homework:
-        raise KeyError('В ответе отсутсвует ключ homework_name')
-    homework_name = homework.get('homework_name')
-    homework_status = homework.get('status')
-    if homework_status not in HOMEWORK_VERDICTS:
-        raise ValueError(f'Неизвестный статус работы - {homework_status}')
-    return (
-        'Изменился статус проверки работы "{homework_name}" {verdict}'
-    ).format(
-        homework_name=homework_name,
-        verdict=HOMEWORK_VERDICTS[homework_status]
-    )
+        logger.error('Отсутствует "homework_name" в  API')
+        raise KeyError('Отсутствует "homework_name" в  API')
+    if 'status' not in homework:
+        logger.error('Отсутствует "homework_status" в  API')
+        raise KeyError('Отсутствует "status" в  API')
+    if homework['status'] not in HOMEWORK_VERDICTS:
+        logging.error('Не проверенный статус в  API')
+        raise KeyError('Не проверенный статус в  API')
+    homework_name = homework['homework_name']
+    homework_status = homework['status']
+    verdict = HOMEWORK_VERDICTS[homework_status]
+    return f'Изменился статус проверки работы "{homework_name}" {verdict}'
 
 
 def main() -> None:
