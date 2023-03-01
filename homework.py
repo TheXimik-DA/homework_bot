@@ -53,7 +53,9 @@ def send_message(bot, message):
 def get_api_answer(current_timestamp):
     """Проверка статуса домашней работы."""
     timestamp = current_timestamp or int(time.time())
-    params = {'from_date': timestamp}
+    params = {
+        'from_date': timestamp
+    }
     try:
         homework_statuses = requests.get(
             ENDPOINT,
@@ -105,36 +107,27 @@ def parse_status(homework):
 
 def main() -> None:
     """Основная логика работы бота."""
-    logging.info('Бот активен')
     if not check_tokens():
-        logging.critical('Отсутствует нужное количество'
-                         ' переменных окружения')
-        sys.exit('Отсутсвуют все переменные окружения')
+        logger.critical('Отсутствует одна из обязательных '
+                        'переменных окружения')
+        exit()
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    timestamp: str = FROM_DATE
-    last_error_message: str = ''
-    telegram_error_check: bool = False
+    current_timestamp = int(time.time())
+    message = ''
     while True:
         try:
-            result: dict = get_api_answer(timestamp)
-            homeworks: list = check_response(result)
-            logging.info('Список домашних работ получен')
-            if len(homeworks) > 0 and homeworks[0] != timestamp:
-                send_message(bot, parse_status(homeworks[0]))
-                timestamp = result['current_date']
-        except (ConnectionError, TimeoutError) as error:
-            if str(error) != last_error_message and not telegram_error_check:
-                current_time = CURRENT_TIME
-                message: str = (f'[{current_time}]'
-                                f'Сбой в работе программы: {error}')
-                logging.error(message)
-                send_message(bot, message)
-                last_error_message = str(error)
-                telegram_error_check = True
-        except telegram.error.TelegramError as error:
-            current_time = CURRENT_TIME
-            message: str = f'[{current_time}] Ошибка Telegram: {error}'
-            logging.error(message)
+            response = get_api_answer(current_timestamp)
+            if check_response(response):
+                homework = check_response(response)
+                if parse_status(homework[0]) != message:
+                    message = parse_status(homework[0])
+                    send_message(bot, message)
+            else:
+                current_timestamp = response.get("current_date")
+        except Exception as error:
+            message = f'Сбой в работе программы: {error}'
+            logger.error(message)
+            send_message(bot, message)
         finally:
             time.sleep(RETRY_PERIOD)
 
