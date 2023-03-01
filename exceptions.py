@@ -32,3 +32,15 @@ class InvalidResponseCode(Exception):
     """Не верный код ответа."""
 
     pass
+
+
+class HomeWorkIsNotList(Exception):
+    """Проверка домашней работы."""
+
+    pass
+
+
+class GetApiException(Exception):
+    """Проверка API."""
+
+    pass

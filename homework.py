@@ -27,6 +27,8 @@ HOMEWORK_VERDICTS = {
     'reviewing': 'Работа взята на проверку ревьюером.',
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
+logger = logging.getLogger(__name__)
+CURRENT_TIME = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
 def check_tokens():
@@ -41,6 +43,7 @@ def send_message(bot, message):
             chat_id=TELEGRAM_CHAT_ID,
             text=message,
         )
+        logger.info(f'Бот отправил сообщение "{message}"')
     except telegram.TelegramError as error:
         logging.error(f'Gри отправке сообщения возникла ошибка: {error}')
     else:
@@ -77,17 +80,19 @@ def get_api_answer(current_timestamp):
 
 def check_response(response) -> list:
     """Проверка валидности ответа."""
+    try:
+        homeworks = response['homeworks']
+    except KeyError:
+        message = 'Ключ "homeworks" отсутствует в ответе API.'
+        raise KeyError(message)
     if not isinstance(response, dict):
         raise TypeError(
             f'API должен возвращать словарь, получен {type(response)}.')
-    if 'homeworks' not in response:
-        raise KeyError(
-            'Ключ "homeworks" отсутствует в ответе API.')
-    if not isinstance(response['homeworks'], list):
+    if not isinstance(homeworks, list):
         raise TypeError(
             f'Значение по ключу "homeworks" должно быть списком, '
-            f'Получено {type(response["homeworks"])}.')
-    return response['homeworks']
+            f'Получено {type(homeworks)}.')
+    return homeworks
 
 
 def parse_status(homework):
@@ -127,9 +132,7 @@ def main() -> None:
                 timestamp = result['current_date']
         except (ConnectionError, TimeoutError) as error:
             if str(error) != last_error_message and not telegram_error_check:
-                current_time = datetime.datetime.now().strftime(
-                    '%Y-%m-%d %H:%M:%S'
-                )
+                current_time = CURRENT_TIME
                 message: str = (f'[{current_time}]'
                                 f'Сбой в работе программы: {error}')
                 logging.error(message)
@@ -137,9 +140,7 @@ def main() -> None:
                 last_error_message = str(error)
                 telegram_error_check = True
         except telegram.error.TelegramError as error:
-            current_time = datetime.datetime.now().strftime(
-                '%Y-%m-%d %H:%M:%S'
-            )
+            current_time = CURRENT_TIME
             message: str = f'[{current_time}] Ошибка Telegram: {error}'
             logging.error(message)
         finally:
