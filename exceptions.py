@@ -44,3 +44,9 @@ class GetApiException(Exception):
     """Проверка API."""
 
     pass
+
+
+class StatusCodeException(Exception):
+    """Статус."""
+
+    pass
