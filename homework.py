@@ -4,10 +4,11 @@ import os
 import sys
 import time
 from http import HTTPStatus
-from exceptions import (NoCurrentDateKeyInResponseError)
+
 import requests
 import telegram
 from dotenv import load_dotenv
+from exceptions import NoCurrentDateKeyInResponseError
 
 load_dotenv()
 
@@ -83,7 +84,9 @@ def check_response(response):
         )
     homeworks = response['homeworks']
     if not isinstance(homeworks, list):
-        raise TypeError('Домашние работы приходят не в виде списка в ответ от API')
+        raise TypeError(
+            'Домашние работы приходят не в виде списка в ответ от API'
+        )
     return homeworks
 
 
