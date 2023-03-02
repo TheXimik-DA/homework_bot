@@ -4,7 +4,7 @@ import os
 import sys
 import time
 from http import HTTPStatus
-
+from exceptions import (NoCurrentDateKeyInResponseError)
 import requests
 import telegram
 from dotenv import load_dotenv
@@ -64,39 +64,36 @@ def get_api_answer(current_timestamp):
         if homework_statuses.status_code != HTTPStatus.OK:
             raise Exception(f'Недоступность эндпойнта '
                             f'{homework_statuses.status_code}')
-        else:
-            return homework_statuses.json()
+        return homework_statuses.json()
     except Exception as error:
         raise Exception(f'Сбой при запросе к эндпойнту: {error}')
 
 
-def check_response(response) -> list:
+def check_response(response):
     """Проверка валидности ответа."""
-    try:
-        homeworks = response['homeworks']
-    except KeyError:
-        message = 'Ключ "homeworks" отсутствует в ответе API.'
-        raise KeyError(message)
     if not isinstance(response, dict):
-        raise TypeError(
-            f'API должен возвращать словарь, получен {type(response)}.')
+        raise TypeError('Ответ пришел не в виде словаря.')
+    if 'homeworks' not in response:
+        raise KeyError(
+            'В ответе нет ключа homeworks'
+        )
+    if 'current_date' not in response:
+        raise NoCurrentDateKeyInResponseError(
+            'В ответе нет ключа current_date'
+        )
+    homeworks = response['homeworks']
     if not isinstance(homeworks, list):
-        raise TypeError(
-            f'Значение по ключу "homeworks" должно быть списком, '
-            f'Получено {type(homeworks)}.')
+        raise TypeError('Домашние работы приходят не в виде списка в ответ от API')
     return homeworks
 
 
 def parse_status(homework):
     """Парсинг ответов."""
     if 'homework_name' not in homework:
-        logger.error('Отсутствует "homework_name" в  API')
         raise KeyError('Отсутствует "homework_name" в  API')
     if 'status' not in homework:
-        logger.error('Отсутствует "homework_status" в  API')
         raise KeyError('Отсутствует "status" в  API')
     if homework['status'] not in HOMEWORK_VERDICTS:
-        logging.error('Не проверенный статус в  API')
         raise KeyError('Не проверенный статус в  API')
     homework_name = homework['homework_name']
     homework_status = homework['status']
@@ -112,17 +109,17 @@ def main() -> None:
         exit()
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
-    message = ''
+    last_message = ''
     while True:
         try:
             response = get_api_answer(current_timestamp)
-            if check_response(response):
-                homework = check_response(response)
-                if parse_status(homework[0]) != message:
-                    message = parse_status(homework[0])
+            homework = check_response(response)
+            if homework:
+                message = parse_status(homework[0])
+                if message != last_message:
+                    last_message = message
                     send_message(bot, message)
-            else:
-                current_timestamp = response.get("current_date")
+            current_timestamp = response.get('current_date')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logger.error(message)
